@@ -1,7 +1,7 @@
-# Challenge 02 - Satisfying Interfaces in Go
+# Challenge 04 - Checking for Duplicates
 
-In this challenge, you are going to implement the necessary methods needed to satisfy the provided Go interface.
+In this challenge, we are going to be looking at how you can effectively filter out the duplicate entries from a slice in Go.
 
-On the left-hand screen, you have a simple Go application that features an interface called `Employee`.
+The task will be to implement the `FilterDuplicates` function so that it returns a slice of type string which contains only the unique names of developers retrieved from the inputted list.
 
-In order to complete this challenge, you will have to complete the code and satisfy this interface.
+**Example:**

@@ -1,7 +1,16 @@
-# Challenge 02 - Satisfying Interfaces in Go
 
-In this challenge, you are going to implement the necessary methods needed to satisfy the provided Go interface.
+# Challenge 03 - Sorting Flights by Price
 
-On the left-hand screen, you have a simple Go application that features an interface called `Employee`.
+In this challenge, you are going to be attempting to sort a list of `Flights` based on their **price from highest to lowest**.
 
-In order to complete this challenge, you will have to complete the code and satisfy this interface.
+---
+
+## Task
+
+You will have to implement the `SortByPrice` function that takes in a slice of type `Flight` and returns the sorted list of `Flights`.
+
+---
+
+## Hint
+
+In order to help you see what is going on, you have been provided with a very quick `printFlights` function which you can use to print the flights out.
