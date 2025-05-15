@@ -12,32 +12,56 @@ import (
 
 func SignUp(c *gin.Context) {
 	var user models.User
-	c.BindJSON(&user)
 
-	hashed, _ := utils.HashPassword(user.Password)
-	user.Password = hashed
-	result := database.DB.Create(&user)
-
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Tài khoản đã tồn tại"})
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dữ liệu đầu vào không hợp lệ"})
 		return
 	}
+
+	hashed, err := utils.HashPassword(user.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể mã hóa mật khẩu"})
+		return
+	}
+
+	user.Password = hashed
+	if err := database.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tài khoản đã tồn tại hoặc lỗi khi tạo tài khoản"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Đăng ký thành công"})
 }
 
 func SignIn(c *gin.Context) {
 	var input models.User
-	var user models.User
-	c.BindJSON(&input)
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dữ liệu đầu vào không hợp lệ"})
+		return
+	}
 
-	result := database.DB.Where("username = ?", input.Username).First(&user)
-	if result.Error != nil || !utils.CheckPasswordHash(input.Password, user.Password) {
+	var user models.User
+	if err := database.DB.Where("username = ?", input.Username).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sai tài khoản hoặc mật khẩu"})
 		return
 	}
 
-	token, _ := utils.GenerateToken(user.Username)
-	refreshToken, _ := utils.GenerateRefreshToken(user.Username)
+	if !utils.CheckPasswordHash(input.Password, user.Password) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sai tài khoản hoặc mật khẩu"})
+		return
+	}
+
+	token, err := utils.GenerateToken(user.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo access token"})
+		return
+	}
+
+	refreshToken, err := utils.GenerateRefreshToken(user.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo refresh token"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token":  token,
@@ -46,21 +70,41 @@ func SignIn(c *gin.Context) {
 }
 
 func Refresh(c *gin.Context) {
-	type RefreshRequest struct {
+	var req struct {
 		Token string `json:"token"`
 	}
-	var req RefreshRequest
-	c.BindJSON(&req)
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token không hợp lệ"})
+		return
+	}
 
 	token, err := jwt.Parse(req.Token, func(token *jwt.Token) (interface{}, error) {
 		return utils.JwtKey, nil
 	})
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		username := claims["username"].(string)
-		newToken, _ := utils.GenerateToken(username)
-		c.JSON(http.StatusOK, gin.H{"access_token": newToken})
-	} else {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ", "err": err})
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ"})
+		return
 	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || claims["username"] == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ"})
+		return
+	}
+
+	username, ok := claims["username"].(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ"})
+		return
+	}
+
+	newToken, err := utils.GenerateToken(username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo token mới"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"access_token": newToken})
 }
